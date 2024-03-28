@@ -2,9 +2,9 @@ from dotenv import load_dotenv
 load_dotenv()  # take environment variables from .env.
 
 import os
+import subprocess
 import asyncio
 import threading
-import os
 import sounddevice
 import pyaudio
 from starlette.websockets import WebSocket
@@ -49,13 +49,15 @@ CHANNELS = 1  # Mono
 RATE = 44100  # Sample rate
 RECORDING = False  # Flag to control recording state
 SPACEBAR_PRESSED = False  # Flag to track spacebar press state
-
+CAMERA_ENABLED = False
 # Camera configuration
-CAMERA_ENABLED = os.getenv('CAMERA_ENABLED', False)
-if type(CAMERA_ENABLED) == str:
-    CAMERA_ENABLED = (CAMERA_ENABLED.lower() == "true")
-CAMERA_DEVICE_INDEX = int(os.getenv('CAMERA_DEVICE_INDEX', 0))
-CAMERA_WARMUP_SECONDS = float(os.getenv('CAMERA_WARMUP_SECONDS', 0))
+# CAMERA_ENABLED = os.getenv('CAMERA_ENABLED', False)
+# logger.info(f"Camera status is {CAMERA_ENABLED}")
+
+# if type(CAMERA_ENABLED) == str:
+#     CAMERA_ENABLED = (CAMERA_ENABLED.lower() == "true")
+# CAMERA_DEVICE_INDEX = int(os.getenv('CAMERA_DEVICE_INDEX', 0))
+# CAMERA_WARMUP_SECONDS = float(os.getenv('CAMERA_WARMUP_SECONDS', 0))
 
 # Specify OS
 current_platform = get_system_info()
@@ -67,38 +69,74 @@ send_queue = queue.Queue()
 
 class Device:
     def __init__(self):
+        global CAMERA_ENABLED
         self.pressed_keys = set()
         self.captured_images = []
         self.audiosegments = []
         self.server_url = ""
 
-    def fetch_image_from_camera(self, camera_index=CAMERA_DEVICE_INDEX):
-        """Captures an image from the specified camera device and saves it to a temporary file. Adds the image to the captured_images list."""
-        image_path = None
+        # Check camera available using libcamera-hello
+        CAMERA_ENABLED = self.check_camera_availability()
 
-        cap = cv2.VideoCapture(camera_index)
-        ret, frame = cap.read()  # Capture a single frame to initialize the camera
+    def check_camera_availability(self):
+        """Check if any camera is available using libcamera-hello."""
+        try:
+            # Execute libcamera-hello --list-cameras to get the list of available cameras
+            result = subprocess.run(['libcamera-hello', '--list-cameras'], check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+            output = result.stdout
+            if "Available cameras" in output:
+                return True
+        except subprocess.CalledProcessError as e:
+            logger.error("Failed to check camera availability with libcamera-hello.")
+        return False
+    
+    
+    # def fetch_image_from_camera(self, camera_index=CAMERA_DEVICE_INDEX):
+    #     """Captures an image from the specified camera device and saves it to a temporary file. Adds the image to the captured_images list."""
+    #     image_path = None
 
-        if CAMERA_WARMUP_SECONDS > 0:
-            # Allow camera to warm up, then snap a picture again
-            # This is a workaround for some cameras that don't return a properly exposed
-            # picture immediately when they are first turned on
-            time.sleep(CAMERA_WARMUP_SECONDS)
-            ret, frame = cap.read()
+    #     cap = cv2.VideoCapture(camera_index)
+    #     ret, frame = cap.read()  # Capture a single frame to initialize the camera
 
-        if ret:
-            temp_dir = tempfile.gettempdir()
-            image_path = os.path.join(temp_dir, f"01_photo_{datetime.now().strftime('%Y%m%d%H%M%S%f')}.png")
+    #     if CAMERA_WARMUP_SECONDS > 0:
+    #         # Allow camera to warm up, then snap a picture again
+    #         # This is a workaround for some cameras that don't return a properly exposed
+    #         # picture immediately when they are first turned on
+    #         time.sleep(CAMERA_WARMUP_SECONDS)
+    #         ret, frame = cap.read()
+
+    #     if ret:
+    #         temp_dir = tempfile.gettempdir()
+    #         image_path = os.path.join(temp_dir, f"01_photo_{datetime.now().strftime('%Y%m%d%H%M%S%f')}.png")
+    #         self.captured_images.append(image_path)
+    #         cv2.imwrite(image_path, frame)
+    #         logger.info(f"Camera image captured to {image_path}")
+    #         logger.info(f"You now have {len(self.captured_images)} images which will be sent along with your next audio message.")
+    #     else:
+    #         logger.error(f"Error: Couldn't capture an image from camera ({camera_index})")
+
+    #     cap.release()
+
+    #     return image_path
+
+    def fetch_image_from_camera(self):
+        """Captures an image using libcamera-jpeg and saves it to a temporary file."""
+        # Define the directory and filename for the image
+        temp_dir = tempfile.gettempdir()
+        image_path = os.path.join(temp_dir, f"01_photo_{datetime.now().strftime('%Y%m%d%H%M%S%f')}.png")
+
+        try:
+            # Execute the command
+            subprocess.run(['libcamera-jpeg', '-o', image_path, '-t', '1'], check=True)
+            # If the command was successful, log the information and add the image path to the captured images list
             self.captured_images.append(image_path)
-            cv2.imwrite(image_path, frame)
             logger.info(f"Camera image captured to {image_path}")
             logger.info(f"You now have {len(self.captured_images)} images which will be sent along with your next audio message.")
-        else:
-            logger.error(f"Error: Couldn't capture an image from camera ({camera_index})")
-
-        cap.release()
-
-        return image_path
+            return image_path
+        except subprocess.CalledProcessError as e:
+            # If an error occurred during command execution, log the error
+            logger.error(f"Error capturing image with libcamera-jpeg: {e}")
+            return None
     
 
     def encode_image_to_base64(self, image_path):
