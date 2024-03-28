@@ -33,8 +33,6 @@ dateparser = "^1.2.0"
 pytimeparse = "^1.1.8"
 python-crontab = "^3.0.0"
 inquirer = "^3.2.4"
-sounddevice = "^0.4.6"
-pygobject = "^3.48.1"
 
 [build-system]
 requires = ["poetry-core"]
