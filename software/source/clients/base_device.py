@@ -7,7 +7,7 @@ import subprocess
 import asyncio
 import threading
 import os
-import soundevice
+import sounddevice
 import pyaudio
 from pynput import keyboard
 import json
