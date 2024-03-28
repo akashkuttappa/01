@@ -5,6 +5,7 @@ import os
 import asyncio
 import threading
 import os
+import soundevice
 import pyaudio
 from starlette.websockets import WebSocket
 from queue import Queue
@@ -326,9 +327,9 @@ class Device:
             
             # If Raspberry Pi, add the button listener, otherwise use the spacebar
             if current_platform.startswith("raspberry-pi"):
-                logger.info("Raspberry Pi detected, using button on GPIO pin 15")
-                # Use GPIO pin 15
-                pindef = ["gpiochip4", "15"] # gpiofind PIN15
+                logger.info("Raspberry Pi detected, using button on GPIO pin 14")
+                # Use GPIO pin 14
+                pindef = ["gpiochip0", "14"] # gpiofind PIN14
                 print("PINDEF", pindef)
 
                 # HACK: needs passwordless sudo
@@ -338,9 +339,9 @@ class Device:
                     if line:
                         line = line.decode().strip()
                         if "FALLING" in line:
-                            self.toggle_recording(False)
-                        elif "RISING" in line:
                             self.toggle_recording(True)
+                        elif "RISING" in line:
+                            self.toggle_recording(False)
                     else:
                         break
             else:
