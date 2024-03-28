@@ -5,7 +5,7 @@ import os
 import asyncio
 import threading
 import os
-import soundevice
+import sounddevice
 import pyaudio
 from starlette.websockets import WebSocket
 from queue import Queue
