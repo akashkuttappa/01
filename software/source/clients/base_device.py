@@ -402,7 +402,7 @@ class Device:
         if current_platform.startswith("raspberry-pi"):
             logger.info("Raspberry Pi detected, using button on GPIO pin 15")
             # Use GPIO pin 17
-            pindef = ["gpiochip4", "17"]  # gpiofind PIN17
+            pindef = ["gpiochip0", "17"]  # gpiofind PIN17
             print("PINDEF", pindef)
 
             # HACK: needs passwordless sudo
@@ -414,9 +414,9 @@ class Device:
                 if line:
                     line = line.decode().strip()
                     if "FALLING" in line:
-                        self.toggle_recording(False)
-                    elif "RISING" in line:
                         self.toggle_recording(True)
+                    elif "RISING" in line:
+                        self.toggle_recording(False)
                 else:
                     break
         else:
